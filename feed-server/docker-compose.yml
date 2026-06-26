@@ -1,0 +1,50 @@
+# mirror-feed: 피드 서버(FastAPI) + Claude MCP 커넥터용 OAuth 프록시
+#
+# - mirror-feed   : 웹/읽기 API(LAN, 미러 iframe) + /mcp(업스트림). MIRROR_MCP_TOKEN 설정 시 /mcp 보호.
+# - mirror-feed-mcp-oauth : OAuth 2.1 프록시(affine 의 mcp-oauth 재사용). 공개 HTTPS 로 노출하는 대상.
+#   Claude →(OAuth)→ mcp-oauth →(Bearer)→ mirror-feed:8090/mcp/
+services:
+  mirror-feed:
+    container_name: mirror-feed
+    build:
+      context: .
+    image: mirror-feed:latest
+    restart: always
+    ports:
+      - "8090:8090"            # LAN: 미러 iframe(GET /) + 읽기 API
+    environment:
+      - MIRROR_WEB_BASE=http://127.0.0.1:8090
+      - MIRROR_POLL_MS=60000
+      - MIRROR_ROTATE_MS=12000
+      - MIRROR_MCP_TOKEN=${MIRROR_MCP_TOKEN:-}   # 설정 시 /mcp Bearer 검사 활성화
+    volumes:
+      - mirror-feed-data:/app/data
+    networks:
+      - mirror-net
+
+  mirror-feed-mcp-oauth:
+    container_name: mirror-feed-mcp-oauth
+    build:
+      context: ../../affine/mcp-oauth     # 기존 OAuth 2.1 프록시 코드 재사용
+    restart: always
+    ports:
+      - "4001:4001"            # 이 포트를 공개 HTTPS(도메인/터널)로 노출
+    environment:
+      - PORT=4001
+      - PUBLIC_URL=${MIRROR_MCP_PUBLIC_URL}        # 예: https://mirror-mcp.example.com
+      - MCP_UPSTREAM_URL=http://mirror-feed:8090/mcp/
+      - MCP_BEARER_TOKEN=${MIRROR_MCP_TOKEN}       # mirror-feed 가 검사하는 토큰과 동일
+      - ADMIN_PASSWORD=${MIRROR_MCP_ADMIN_PW}      # 단일 사용자 로그인 비번
+      - TOKEN_SECRET=${MIRROR_MCP_TOKEN_SECRET}
+      - TOKEN_TTL_SEC=2592000
+      - SESSION_TTL_SEC=2592000
+    depends_on:
+      - mirror-feed
+    networks:
+      - mirror-net
+
+volumes:
+  mirror-feed-data:
+
+networks:
+  mirror-net:

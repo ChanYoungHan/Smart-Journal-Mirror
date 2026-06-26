@@ -1,0 +1,127 @@
+name: affine
+services:
+  affine:
+    image: ghcr.io/toeverything/affine:${AFFINE_REVISION:-stable}
+    container_name: affine_server
+    ports:
+      - '${PORT:-3010}:3010'
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      affine_migration:
+        condition: service_completed_successfully
+    volumes:
+      # custom configurations
+      - ${UPLOAD_LOCATION}:/root/.affine/storage
+      - ${CONFIG_LOCATION}:/root/.affine/config
+    env_file:
+      - .env
+    environment:
+      - REDIS_SERVER_HOST=redis
+      - DATABASE_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE:-affine}
+      - AFFINE_INDEXER_ENABLED=false
+      - NODE_OPTIONS=--max-old-space-size=4096
+    restart: unless-stopped
+    networks:
+      - affine_default
+
+  affine_migration:
+    image: ghcr.io/toeverything/affine:${AFFINE_REVISION:-stable}
+    container_name: affine_migration_job
+    volumes:
+      # custom configurations
+      - ${UPLOAD_LOCATION}:/root/.affine/storage
+      - ${CONFIG_LOCATION}:/root/.affine/config
+    command: ['sh', '-c', 'node ./scripts/self-host-predeploy.js']
+    env_file:
+      - .env
+    environment:
+      - REDIS_SERVER_HOST=redis
+      - DATABASE_URL=postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE:-affine}
+      - AFFINE_INDEXER_ENABLED=false
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - affine_default
+
+  redis:
+    image: redis
+    container_name: affine_redis
+    healthcheck:
+      test: ['CMD', 'redis-cli', '--raw', 'incr', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - affine_default
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: affine_postgres
+    volumes:
+      - ${DB_DATA_LOCATION}:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE:-affine}
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+      # you better set a password for you database
+      # or you may add 'POSTGRES_HOST_AUTH_METHOD=trust' to ignore postgres security policy
+      POSTGRES_HOST_AUTH_METHOD: trust
+    healthcheck:
+      test:
+        ['CMD', 'pg_isready', '-U', "${DB_USERNAME}", '-d', "${DB_DATABASE:-affine}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - affine_default
+
+  affine-mcp:
+    image: ghcr.io/dawncr0w/affine-mcp-server:latest
+    container_name: affine-mcp
+    ports:
+      - '3000:3000'
+    environment:
+      - MCP_TRANSPORT=http
+      - AFFINE_BASE_URL=http://affine:${PORT}
+      - AFFINE_API_TOKEN=${API_TOKEN}
+      - AFFINE_MCP_AUTH_MODE=bearer
+      - AFFINE_MCP_HTTP_TOKEN=${MCP_HTTP_TOKEN}
+    depends_on:
+      - affine
+    restart: unless-stopped
+    networks:
+      - affine_default
+
+  mcp-oauth:
+    build:
+      context: ./mcp-oauth
+      dockerfile: Dockerfile
+    container_name: mcp-oauth
+    ports:
+      - '4000:4000'
+    environment:
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - MCP_UPSTREAM_URL=http://affine-mcp:3000/mcp
+      - MCP_BEARER_TOKEN=${MCP_HTTP_TOKEN}
+      - TOKEN_SECRET=${TOKEN_SECRET}
+      - PUBLIC_URL=${PUBLIC_URL}
+      - TOKEN_TTL_SEC=${TOKEN_TTL_SEC:-2592000}
+      - SESSION_TTL_SEC=${SESSION_TTL_SEC:-2592000}
+    depends_on:
+      - affine-mcp
+    restart: unless-stopped
+    networks:
+      - affine_default
+
+networks:
+  affine_default:
+    name: affine_default

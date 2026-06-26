@@ -1,0 +1,15 @@
+services:
+  labwc:
+    container_name: labwc
+    restart: always
+    image: ${LABWC_IMAGE}
+    environment:
+      - XDG_RUNTIME_DIR=${LAB_WC_SOCK_DIR}
+      - RANDR_PARAMS
+      - RANDR_POLL
+      - LAB_WC_HIDE_CURSOR
+    volumes:
+      - $LAB_WC_SOCK_DIR:$LAB_WC_SOCK_DIR
+      # needed for activating input devices, e.g. mouse:
+      - /run/udev:/run/udev
+    privileged: true

@@ -1,0 +1,76 @@
+x-master: &master
+  image: ${MM_IMAGE}
+  volumes:
+    - ${VOLUME_CONFIG}
+    - ${VOLUME_MODULES}
+    - ${VOLUME_CSS}
+  environment:
+    - MM_OVERRIDE_DEFAULT_MODULES
+    - MM_SHOW_CURSOR
+    - MM_SCENARIO
+    - MM_MODULES_DIR
+    - MM_CUSTOMCSS_FILE
+    - MIRROR_FEED_HOST=${MIRROR_FEED_HOST:-http://localhost:8090}
+    - MIRROR_FEED_UPDATE_MS=${MIRROR_FEED_UPDATE_MS:-60000}
+    - MIRROR_FEED_ROTATE_MS=${MIRROR_FEED_ROTATE_MS:-12000}
+  post_start:
+    - command:
+        - /bin/sh
+        - -c
+        - |
+          if [ "$MM_INIT" = "init" ]; then
+            # update volume permissions
+            chown -R ${MM_UID}:${MM_GID} config ${MM_MODULES_DIR} ${MM_CUSTOMCSS_FILE}
+            chmod -R ${MM_CHMOD} config ${MM_MODULES_DIR} ${MM_CUSTOMCSS_FILE}
+          fi
+          if command -v node_modules/.bin/electron > /dev/null; then
+            # if electron is installed then start dbus-daemon to avoid errors in the logs
+            dbus-daemon --system || true
+          fi
+      user: root
+
+services:
+  deps_no:
+  deps_labwc:
+    depends_on:
+      labwc:
+        restart: true
+        condition: service_healthy
+  gui:
+    volumes:
+      # xserver:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - $HOME/.Xauthority:/home/node/.Xauthority
+      # labwc
+      - $LAB_WC_SOCK_DIR:$LAB_WC_SOCK_DIR
+    privileged: true
+    environment:
+      # xserver:
+      - DISPLAY=unix:0.0
+      # labwc
+      - WAYLAND_DISPLAY=wayland-0
+      - XDG_RUNTIME_DIR=${LAB_WC_SOCK_DIR}
+      # - DBUS_SYSTEM_BUS_ADDRESS=unix:path=${LAB_WC_SOCK_DIR}/bus
+      # - DBUS_SESSION_BUS_ADDRESS=unix:path=${LAB_WC_SOCK_DIR}/bus
+      # GPU
+      - ELECTRON_ENABLE_GPU
+    shm_size: "256mb"
+    extends:
+      service: deps_${MM_LABWC}
+  # server
+  server:
+    <<: *master
+    ports:
+      - ${MM_SERVER_PORTS}
+  # electron
+  electron:
+    <<: *master
+    network_mode: host
+    extends:
+      service: gui
+  # client
+  client:
+    image: ${MM_IMAGE}
+    extends:
+      service: gui
+    command: "node clientonly --address ${MM_CLIENT_ADDRESS} --port ${MM_CLIENT_PORT}"

@@ -1,0 +1,11 @@
+services:
+  watchtower:
+    privileged: true
+    image: ${WATCHTOWER_IMAGE}
+    container_name: watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    # --interval 300 --> poll interval in seconds
+    # --cleanup --> for auto image pruning
+    command: --interval ${MM_WATCHTOWER_INTERVAL} ${MM_WATCHTOWER_CLEANUP}
+    restart: always

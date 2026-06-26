@@ -1,0 +1,7 @@
+# 3rd party modules (separate git repos, installed via git clone)
+mounts/modules/MMM-*/
+# 우리 자체 모듈은 추적
+!mounts/modules/MMM-MirrorFeed/
+!mounts/modules/MMM-MirrorFeed/**
+# 단, 런타임 캐시(node_helper 가 저장하는 feed.html)는 제외
+mounts/modules/MMM-MirrorFeed/cache/

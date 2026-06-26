@@ -1,0 +1,19 @@
+include:
+  - includes/${MM_MMPM}.yaml
+  - includes/${MM_LABWC}.yaml
+  - includes/${MM_WATCHTOWER}.yaml
+
+services:
+  magicmirror:
+    container_name: mm
+    restart: always
+    extends:
+      file: includes/base.yaml
+      service: ${MM_SCENARIO}
+    networks:
+      - mm-network
+
+networks:
+  mm-network:
+    name: mm-network
+    driver: bridge
