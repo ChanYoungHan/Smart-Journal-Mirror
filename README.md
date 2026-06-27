@@ -15,7 +15,10 @@
 
 ## 시연
 
-- 실사용 영상: _(추가 예정)_
+- 실사용 영상:
+
+  [![스마트 저널 미러 시연 영상](https://img.youtube.com/vi/pUEfWWTSkpg/maxresdefault.jpg)](https://youtu.be/pUEfWWTSkpg)
+
 - 동작 요약: 매일 아침 거울 우상단에 **하루 요약**, 중앙에 **개인화된 한마디**, 하단에 **알아두면 좋은 소식**이 뜬다.
 
 ## 아키텍처
@@ -44,8 +47,8 @@
 
 ## 기술 스택 · 설계 포인트
 
-- **feed-server (FastAPI)** — 상태 변경 단일 진입점(쓰기 API) 위에 MCP를 래핑 by vibe code(FastMCP, Streamable HTTP, stateless·JSON). OpenAPI/Swagger 내장.
-- **커넥터 보안** — MCP Authorization 스펙을 충족 by vibe code. AFFiNE 커넥터에 쓰던 OAuth 프록시를 **재사용**해 일관성 확보.
+- **claude connector** — 웹버전에서도 작동됨을 고려하여 mcp에 OAuth2.1를 추가 by vibe code
+- **feed-server (FastAPI)** — 관리포인트 단일화를 위해 API 위에 MCP를 래핑 by vibe code
 - **MagicMirror 모듈** — 서버에서 받아 저장·렌더하는 커스텀 모듈을 직접 작성. html은 파일로 캐싱 후 iframe, 메시지는 영역별 텍스트로 회전. **호스트·요청주기는 `.env`로 주입**. 라즈베리파이에서는 부팅 시 앱 자동 기동을 위해 **systemd 트리거(서비스)** 방식을 고려.
 - **인프라/운영** — **홈랩(서버)**에 `feed-server`와 `mcp-oauth` 서버를 **Docker Compose**로 구성하고, **NPM(Nginx Proxy Manager)**과 **직접 구매한 도메인**으로 TLS를 종단해 OAuth 엔드포인트를 공개 HTTPS로 운영.
 
